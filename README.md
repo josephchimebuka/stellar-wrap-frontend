@@ -1,6 +1,8 @@
-# Stellar Wrap 🎨✨
+# Stellar Wrap  🎨✨
 
 > **Turn your ledger data into social proof. A shareable, monthly summary of your impact on the Stellar network.**
+
+![Stellar Wrap Landing Page](./public/stellar-wrap.png)
 
 ---
 
