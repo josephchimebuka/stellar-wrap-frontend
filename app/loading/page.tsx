@@ -1,30 +1,32 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useWrapperStore } from '../store/useWrapperStore';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useWrapperStore } from "../store/useWrapperStore";
 
 export default function LoadingPage() {
   const router = useRouter();
   const { address, isConnected } = useWrapperStore();
   const [progress, setProgress] = useState(0);
-  const [loadingText, setLoadingText] = useState('Connecting to Stellar network...');
+  const [loadingText, setLoadingText] = useState(
+    "Connecting to Stellar network...",
+  );
 
   useEffect(() => {
-    // Redirect to connect page if not connected
+    
     if (!isConnected || !address) {
-      router.push('/connect');
+      router.push("/connect");
       return;
     }
 
-    // Simulate loading progress
+ 
     const steps = [
-      { text: 'Connecting to Stellar network...', duration: 1000 },
-      { text: 'Fetching your transaction history...', duration: 1500 },
-      { text: 'Analyzing your Soroban contracts...', duration: 1200 },
-      { text: 'Discovering your NFT activity...', duration: 1000 },
-      { text: 'Calculating your DeFi stats...', duration: 1300 },
-      { text: 'Preparing your 2026 wrap...', duration: 1000 },
+      { text: "Connecting to Stellar network...", duration: 1000 },
+      { text: "Fetching your transaction history...", duration: 1500 },
+      { text: "Analyzing your Soroban contracts...", duration: 1200 },
+      { text: "Discovering your NFT activity...", duration: 1000 },
+      { text: "Calculating your DeFi stats...", duration: 1300 },
+      { text: "Preparing your 2026 wrap...", duration: 1000 },
     ];
 
     let currentStep = 0;
@@ -34,19 +36,18 @@ export default function LoadingPage() {
       if (currentStep < steps.length) {
         const step = steps[currentStep];
         setLoadingText(step.text);
-        
+
         // Increment progress
         currentProgress += 100 / steps.length;
         setProgress(Math.min(currentProgress, 100));
-        
+
         currentStep++;
       } else {
         clearInterval(progressInterval);
-        // Navigate to results page (to be created)
+        // Navigate to results page
         setTimeout(() => {
-          // For now, just show completion
-          setLoadingText('Your wrap is ready! 🎉');
-        }, 500);
+          router.push("/results");
+        }, 800);
       }
     }, 1200);
 
@@ -76,7 +77,13 @@ export default function LoadingPage() {
               <div className="relative w-24 h-24">
                 <div className="absolute inset-0 border-4 border-bg-elevated rounded-full"></div>
                 <div className="absolute inset-0 border-4 border-accent-primary border-t-transparent rounded-full animate-spin"></div>
-                <div className="absolute inset-2 border-4 border-accent-secondary border-b-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                <div
+                  className="absolute inset-2 border-4 border-accent-secondary border-b-transparent rounded-full animate-spin"
+                  style={{
+                    animationDirection: "reverse",
+                    animationDuration: "1.5s",
+                  }}
+                ></div>
               </div>
             </div>
 
@@ -103,7 +110,9 @@ export default function LoadingPage() {
             {/* Connected Wallet Info */}
             {address && (
               <div className="mt-8 p-4 bg-bg-elevated border border-muted rounded-xl">
-                <p className="text-xs text-text-muted text-center mb-1">Connected Wallet</p>
+                <p className="text-xs text-text-muted text-center mb-1">
+                  Connected Wallet
+                </p>
                 <p className="text-sm font-mono text-accent-primary text-center truncate">
                   {address}
                 </p>
@@ -114,7 +123,8 @@ export default function LoadingPage() {
           {/* Fun Facts */}
           <div className="text-center space-y-2 animate-fade-in delay-600">
             <p className="text-sm text-text-muted italic">
-              Did you know? The Stellar network processes transactions in 3-5 seconds! ⚡
+              Did you know? The Stellar network processes transactions in 3-5
+              seconds! ⚡
             </p>
           </div>
         </div>
