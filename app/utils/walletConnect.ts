@@ -1,4 +1,4 @@
-import { isConnected, getAddress, requestAccess } from '@stellar/freighter-api';
+import { isConnected, getAddress, requestAccess } from "@stellar/freighter-api";
 
 /**
  * Checks if Freighter wallet extension is installed
@@ -19,19 +19,21 @@ export const isFreighterInstalled = async (): Promise<boolean> => {
 export const connectFreighter = async (): Promise<string> => {
   // Check if Freighter is installed
   const installed = await isFreighterInstalled();
-  
+
   if (!installed) {
     throw new Error(
-      'Freighter wallet not found. Please install the Freighter browser extension.'
+      "Freighter wallet not found. Please install the Freighter browser extension.",
     );
   }
 
   try {
     // Request access to the wallet
     const accessResult = await requestAccess();
-    
+
     if (accessResult.error || !accessResult.address) {
-      throw new Error('Connection rejected. Please approve the connection in Freighter.');
+      throw new Error(
+        "Connection rejected. Please approve the connection in Freighter.",
+      );
     }
 
     // Return the address from requestAccess (it already provides the address)
@@ -39,13 +41,13 @@ export const connectFreighter = async (): Promise<string> => {
   } catch (error: unknown) {
     // Handle specific error cases
     if (error instanceof Error) {
-      if (error.message?.includes('User declined')) {
-        throw new Error('Connection rejected by user.');
+      if (error.message?.includes("User declined")) {
+        throw new Error("Connection rejected by user.");
       }
       throw error;
     }
 
-    throw new Error('Failed to connect to Freighter wallet. Please try again.');
+    throw new Error("Failed to connect to Freighter wallet. Please try again.");
   }
 };
 
@@ -59,10 +61,36 @@ export const getCurrentPublicKey = async (): Promise<string | null> => {
     if (!installed) {
       return null;
     }
-    
+
     const addressResult = await getAddress();
     return addressResult.error ? null : addressResult.address;
   } catch {
     return null;
   }
+};
+
+/**
+ * Validates if a string is a valid Stellar public key address
+ * Stellar addresses:
+ * - Start with 'G'
+ * - Are exactly 56 characters long
+ * - Use base32 encoding (characters A-Z and 2-7)
+ * @param address The address string to validate
+ * @returns True if valid Stellar address, false otherwise
+ */
+export const isValidStellarAddress = (address: string): boolean => {
+  if (!address || typeof address !== "string") {
+    return false;
+  }
+
+  const trimmedAddress = address.trim();
+
+  // Check if starts with 'G' and is 56 characters
+  if (!trimmedAddress.startsWith("G") || trimmedAddress.length !== 56) {
+    return false;
+  }
+
+  // Check if all characters are valid base32 (A-Z, 2-7)
+  const base32Regex = /^[A-Z2-7]{56}$/;
+  return base32Regex.test(trimmedAddress);
 };
