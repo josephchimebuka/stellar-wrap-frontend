@@ -1,3 +1,5 @@
+export type { Network } from '../config';
+
 export interface TransactionStats {
   totalTransactions: number;
   totalVolume: number;

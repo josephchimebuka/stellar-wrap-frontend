@@ -1,4 +1,5 @@
 import { isConnected, getAddress, requestAccess } from "@stellar/freighter-api";
+import { Network } from "../../src/config";
 
 /**
  * Checks if Freighter wallet extension is installed
@@ -14,9 +15,10 @@ export const isFreighterInstalled = async (): Promise<boolean> => {
 
 /**
  * Connects to Freighter wallet and returns the user's public key
+ * @param _network - The network to connect to (mainnet or testnet)
  * @throws {Error} If wallet is not installed, user rejects connection, or any other error occurs
  */
-export const connectFreighter = async (): Promise<string> => {
+export const connectFreighter = async (_network: Network): Promise<string> => {
   // Check if Freighter is installed
   const installed = await isFreighterInstalled();
 
@@ -28,6 +30,8 @@ export const connectFreighter = async (): Promise<string> => {
 
   try {
     // Request access to the wallet
+    // Note: Freighter API doesn't directly support network parameter in requestAccess,
+    // but the network context is available for future network-specific operations
     const accessResult = await requestAccess();
 
     if (accessResult.error || !accessResult.address) {
@@ -37,6 +41,7 @@ export const connectFreighter = async (): Promise<string> => {
     }
 
     // Return the address from requestAccess (it already provides the address)
+    // The network parameter can be used for subsequent operations like transaction signing
     return accessResult.address;
   } catch (error: unknown) {
     // Handle specific error cases

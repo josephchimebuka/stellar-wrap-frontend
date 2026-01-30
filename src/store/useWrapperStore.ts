@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import { WrappedData } from '../types';
 import { GOLDEN_USER } from '../data/mockData';
+import { buildApiUrl } from '../utils/networkUtils';
+import { Network } from '../config';
 
 interface WrapperStore {
     data: WrappedData | null;
     isLoading: boolean;
     isMock: boolean;
     error: string | null;
-    fetchData: (address: string) => Promise<void>;
+    fetchData: (address: string, network: Network) => Promise<void>;
     toggleMockMode: () => void;
     setLoading: (isLoading: boolean) => void;
     setData: (data: WrappedData | null) => void;
@@ -37,7 +39,7 @@ export const useWrapperStore = create<WrapperStore>((set, get) => ({
         }
     },
 
-    fetchData: async (_address: string) => {
+    fetchData: async (address: string, network: Network) => {
         set({ isLoading: true, error: null });
 
         try {
@@ -46,16 +48,16 @@ export const useWrapperStore = create<WrapperStore>((set, get) => ({
                 await new Promise((resolve) => setTimeout(resolve, 1000));
                 set({ data: GOLDEN_USER, isLoading: false });
             } else {
-                // Placeholder for future API integration
-                // const response = await fetch(`/api/wrapped/${address}`);
-                // const result = await response.json();
-                // set({ data: result, isLoading: false });
-
-                // Temporarily default to error if not in mock mode since API isn't built
-                set({
-                    isLoading: false,
-                    error: "API integration pending. Please enable Mock Mode in dev tool."
-                });
+                // Build API URL with network parameter
+                const apiUrl = buildApiUrl(`/api/wrapped/${address}`, network);
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                set({ data: result, isLoading: false });
             }
         } catch (err) {
             set({
@@ -65,3 +67,4 @@ export const useWrapperStore = create<WrapperStore>((set, get) => ({
         }
     },
 }));
+

@@ -5,6 +5,7 @@ import { Box, Database } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ColorToggle } from './ColorToggle';
+import { NetworkToggle } from './NetworkToggle';
 import { useWrapStore, WrapPeriod } from '../store/wrapStore';
 
 export function LandingPage() {
@@ -269,6 +270,9 @@ export function LandingPage() {
 
         {/* Color Toggle - Fixed Position */}
         <ColorToggle />
+
+        {/* Network Toggle - Fixed Position */}
+        <NetworkToggle />
 
         {/* Dramatic title with illustration */}
         <motion.div

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { Network, DEFAULT_NETWORK } from "../../src/config";
 
 export type WrapPeriod = "weekly" | "monthly" | "yearly";
 
@@ -34,12 +35,14 @@ type WrapStatus = "idle" | "loading" | "ready" | "error";
 interface WrapStoreState {
   address: string | null;
   period: WrapPeriod;
+  network: Network;
   status: WrapStatus;
   error: string | null;
   result: WrapResult | null;
   // setters
   setAddress: (address: string | null) => void;
   setPeriod: (period: WrapPeriod) => void;
+  setNetwork: (network: Network) => void;
   setStatus: (status: WrapStatus) => void;
   setError: (error: string | null) => void;
   setResult: (result: WrapResult | null) => void;
@@ -49,11 +52,13 @@ interface WrapStoreState {
 export const useWrapStore = create<WrapStoreState>((set) => ({
   address: null,
   period: "yearly",
+  network: DEFAULT_NETWORK,
   status: "idle",
   error: null,
   result: null,
   setAddress: (address) => set({ address }),
   setPeriod: (period) => set({ period }),
+  setNetwork: (network) => set({ network }),
   setStatus: (status) => set({ status }),
   setError: (error) => set({ error }),
   setResult: (result) => set({ result }),
@@ -61,6 +66,7 @@ export const useWrapStore = create<WrapStoreState>((set) => ({
     set({
       address: null,
       period: "yearly",
+      network: DEFAULT_NETWORK,
       status: "idle",
       error: null,
       result: null,

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Home } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, KeyboardEvent } from "react";
 
 interface ProgressIndicatorProps {
   currentStep: number;
@@ -30,29 +30,95 @@ export function ProgressIndicator({
   showNext = false,
   routes,
 }: ProgressIndicatorProps) {
-  const router = useRouter();
-  const routeMap = routes || DEFAULT_ROUTES;
-  const [isMobile, setIsMobile] = useState(false);
+   const router = useRouter();
+   const routeMap = routes || DEFAULT_ROUTES;
+   const [isMobile, setIsMobile] = useState(false);
+  const stepRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+     if (typeof window === "undefined") return;
+     const checkMobile = () => setIsMobile(window.innerWidth < 768);
+     checkMobile();
+     window.addEventListener("resize", checkMobile);
+     return () => window.removeEventListener("resize", checkMobile);
+   }, []);
+
+  // Focus management for keyboard navigation
+  useEffect(() => {
+    // Focus the current step indicator on mount
+    if (stepRefs.current[currentStep - 1]) {
+      stepRefs.current[currentStep - 1]?.focus();
+    }
+  }, [currentStep]);
+
+  const handleStepNavigation = (direction: 'left' | 'right') => {
+    if (direction === 'left' && currentStep > 1) {
+      const prevRoute = routeMap[currentStep - 2];
+      if (prevRoute) router.push(prevRoute);
+    } else if (direction === 'right' && currentStep < totalSteps) {
+      const nextRoute = routeMap[currentStep];
+      if (nextRoute) router.push(nextRoute);
+    }
+  };
+
+  const handleStepKeyDown = (event: KeyboardEvent, stepIndex: number, route?: string) => {
+    switch (event.key) {
+      case 'Enter':
+      case ' ':
+        event.preventDefault();
+        if (route && stepIndex + 1 !== currentStep) {
+          router.push(route);
+        }
+        break;
+      case 'ArrowLeft':
+        event.preventDefault();
+        handleStepNavigation('left');
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        handleStepNavigation('right');
+        break;
+      case 'Home':
+        event.preventDefault();
+        router.push('/');
+        break;
+      case 'End':
+        event.preventDefault();
+        const lastRoute = routeMap[routeMap.length - 1];
+        if (lastRoute) router.push(lastRoute);
+        break;
+    }
+  };
+
+  const handleHomeKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      router.push('/');
+    }
+  };
+
+  const handleNextKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onNext?.();
+    }
+  };
 
   return (
     <>
       {/* Home button */}
       <motion.button
         onClick={() => router.push("/")}
-        className="absolute top-6 left-6 md:top-8 md:left-8 z-30 group"
+        onKeyDown={handleHomeKeyDown}
+        className="absolute top-6 left-6 md:top-8 md:left-8 z-30 group focus:outline-none focus:ring-2 focus:ring-theme-primary focus:ring-offset-2 focus:ring-offset-black focus:rounded-xl"
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
+        tabIndex={0}
+        aria-label="Go to home page"
+        role="button"
       >
         <div
           className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-3 rounded-xl backdrop-blur-xl border border-white/20"
@@ -66,7 +132,14 @@ export function ProgressIndicator({
       </motion.button>
 
       {/* Progress dots */}
-      <div className="absolute top-6 md:top-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 md:gap-3">
+      <div
+        className="absolute top-6 md:top-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 md:gap-3"
+        role="progressbar"
+        aria-valuenow={currentStep}
+        aria-valuemin={1}
+        aria-valuemax={totalSteps}
+        aria-label={`Progress: step ${currentStep} of ${totalSteps}`}
+      >
         {[...Array(totalSteps)].map((_, index) => {
           const stepNumber = index + 1;
           const route = routeMap[index];
@@ -81,21 +154,23 @@ export function ProgressIndicator({
           return (
             <motion.button
               key={index}
+              ref={(el) => {
+                stepRefs.current[index] = el;
+              }}
               onClick={handleClick}
+              onKeyDown={(e) => handleStepKeyDown(e, index, route)}
               disabled={!isClickable}
-              className="relative cursor-pointer disabled:cursor-default focus:outline-none p-2 -m-2"
+              className="relative focus:outline-none p-2 -m-2 focus:ring-2 focus:ring-theme-primary focus:ring-offset-2 focus:ring-offset-black focus:rounded-full"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
               whileHover={isClickable ? { scale: 1.2 } : {}}
               whileTap={isClickable ? { scale: 0.9 } : {}}
-              title={
-                route && isClickable
-                  ? `Go to step ${stepNumber}`
-                  : stepNumber === currentStep
-                    ? `Current step: ${stepNumber}`
-                    : undefined
-              }
+              tabIndex={0}
+              role="button"
+              aria-label={route && isClickable ? `Go to step ${stepNumber}` : stepNumber === currentStep ? `Current step: ${stepNumber}` : `Step ${stepNumber}`}
+              aria-current={stepNumber === currentStep ? 'step' : undefined}
+              aria-disabled={!isClickable}
             >
               {/* Active indicator */}
               {stepNumber === currentStep ? (
@@ -140,12 +215,16 @@ export function ProgressIndicator({
       {showNext && onNext && (
         <motion.button
           onClick={onNext}
-          className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-30 group"
+          onKeyDown={handleNextKeyDown}
+          className="absolute bottom-8 right-8 md:bottom-12 md:right-12 z-30 group focus:outline-none focus:ring-2 focus:ring-theme-primary focus:ring-offset-2 focus:ring-offset-black focus:rounded-full"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.5 }}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
+          tabIndex={0}
+          role="button"
+          aria-label="Go to next step"
         >
           <div className="relative">
             <motion.div
