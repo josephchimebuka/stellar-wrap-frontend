@@ -1,14 +1,6 @@
 import { motion } from "motion/react";
-import {
-  Share2,
-  Download,
-  Twitter,
-  Loader2,
-  ExternalLink,
-  Sparkles,
-} from "lucide-react";
+import { Share2, Download, Twitter, Loader2, Sparkles } from "lucide-react";
 import { useState, RefObject } from "react";
-import Link from "next/link";
 import { downloadShareImage } from "../utils/imageExport";
 import { mintWrap } from "../utils/walletKit";
 import { useWrapStore } from "@/app/store/wrapStore";
@@ -34,7 +26,6 @@ export function ShareCard({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
   const [mintSuccess, setMintSuccess] = useState<string | null>(null);
-  const [mintError, setMintError] = useState<string | null>(null);
   const { address } = useWrapStore();
 
   const handleDownload = async () => {
@@ -71,7 +62,6 @@ export function ShareCard({
     }
 
     setIsMinting(true);
-    setMintError(null);
     setMintSuccess(null);
 
     try {
@@ -91,7 +81,6 @@ export function ShareCard({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to mint";
-      setMintError(errorMessage);
       toast.error("Minting failed", {
         description: errorMessage,
       });
