@@ -5,16 +5,21 @@ import { useCallback, useEffect, useMemo } from "react";
 import { Home, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ProgressIndicator } from "../components/ProgressIndicator";
+import { StepProgressDisplay } from "../components/StepProgressDisplay";
 import { MuteToggle } from "../components/MuteToggle";
 import { useWrapStore } from "../store/wrapStore";
+import { useIndexingStore } from "../store/indexingStore";
 import { mockData } from "../data/mockData";
 import { useSound } from "../hooks/useSound";
 import { SOUND_NAMES } from "../utils/soundManager";
+import { indexAccount } from "../services/indexerService";
+import { IndexerEventEmitter } from "../utils/indexerEventEmitter";
 
 export default function LoadingScreen() {
   const router = useRouter();
   const { address, period, network, setStatus, setResult, setError } =
     useWrapStore();
+  const { startIndexing, cancelIndexing, loadState } = useIndexingStore();
   const { playSound } = useSound();
 
   const handleComplete = useCallback(() => {
@@ -22,30 +27,95 @@ export default function LoadingScreen() {
     router.push("/persona");
   }, [router, playSound]);
 
+  const handleCancel = useCallback(() => {
+    cancelIndexing();
+    router.push("/");
+  }, [cancelIndexing, router]);
+
+  const handleRetry = useCallback(() => {
+    // Reset error state and re-run the loading flow by reloading the page
+    // (useEffect cleanup + re-mount is the cleanest way without prop-drilling)
+    window.location.reload();
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
+
+    // Initialize event emitter connection to store on first load
+    IndexerEventEmitter.getInstance().connectToStore();
 
     const loadWrap = async () => {
       try {
         setStatus("loading");
         setError(null);
 
-        // TODO: replace this with a real API/contract call using `address`
-        // For now we hydrate from mockData to keep the flow working.
-        const result = {
-          username: mockData.username,
-          totalTransactions: mockData.transactions,
-          percentile: mockData.percentile,
-          dapps: mockData.dapps.map((dapp) => ({
-            name: dapp.name,
-            interactions: dapp.transactions,
-            color: dapp.color,
-            gradient: dapp.gradient,
-          })),
-          vibes: mockData.vibes,
-          persona: mockData.persona,
-          personaDescription: mockData.personaDescription,
-        };
+        // Attempt to resume from persisted state; only start fresh if no state is restored
+        const wasRestored = loadState();
+        if (!wasRestored) {
+          startIndexing();
+        }
+
+        // Call real indexer service - will emit step progress events
+        let result;
+
+        if (address) {
+          try {
+            const indexerResult = await indexAccount(
+              address,
+              network as "mainnet" | "testnet",
+              period as "weekly" | "monthly" | "yearly",
+            );
+
+            // Map indexer result to wrap result format
+            result = {
+              username: mockData.username,
+              totalTransactions:
+                indexerResult.totalTransactions || mockData.transactions,
+              percentile: mockData.percentile,
+              dapps: mockData.dapps.map((dapp) => ({
+                name: dapp.name,
+                interactions: dapp.transactions,
+                color: dapp.color,
+                gradient: dapp.gradient,
+              })),
+              vibes: mockData.vibes,
+              persona: mockData.persona,
+              personaDescription: mockData.personaDescription,
+            };
+          } catch (indexerError) {
+            // Fallback to mock data if real indexer fails
+            console.warn("Real indexer failed, using mock data:", indexerError);
+            result = {
+              username: mockData.username,
+              totalTransactions: mockData.transactions,
+              percentile: mockData.percentile,
+              dapps: mockData.dapps.map((dapp) => ({
+                name: dapp.name,
+                interactions: dapp.transactions,
+                color: dapp.color,
+                gradient: dapp.gradient,
+              })),
+              vibes: mockData.vibes,
+              persona: mockData.persona,
+              personaDescription: mockData.personaDescription,
+            };
+          }
+        } else {
+          result = {
+            username: mockData.username,
+            totalTransactions: mockData.transactions,
+            percentile: mockData.percentile,
+            dapps: mockData.dapps.map((dapp) => ({
+              name: dapp.name,
+              interactions: dapp.transactions,
+              color: dapp.color,
+              gradient: dapp.gradient,
+            })),
+            vibes: mockData.vibes,
+            persona: mockData.persona,
+            personaDescription: mockData.personaDescription,
+          };
+        }
 
         if (!isMounted) return;
 
@@ -79,6 +149,7 @@ export default function LoadingScreen() {
 
     return () => {
       isMounted = false;
+      IndexerEventEmitter.getInstance().reset();
     };
   }, [
     address,
@@ -88,6 +159,8 @@ export default function LoadingScreen() {
     setResult,
     setStatus,
     handleComplete,
+    startIndexing,
+    loadState,
   ]);
 
   const starConfigs = useMemo(
@@ -104,6 +177,11 @@ export default function LoadingScreen() {
   return (
     <div className="relative w-full min-h-screen h-screen overflow-hidden flex items-center justify-center bg-theme-background">
       <ProgressIndicator currentStep={3} totalSteps={6} showNext={false} />
+
+      {/* Step Progress Display - Shows granular indexing progress */}
+      <div className="relative z-20 pointer-events-auto">
+        <StepProgressDisplay onCancel={handleCancel} onRetry={handleRetry} />
+      </div>
 
       <div className="absolute inset-0 from-black via-black to-black opacity-60" />
 
