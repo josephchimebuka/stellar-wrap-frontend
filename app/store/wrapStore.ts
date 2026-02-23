@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { Network, DEFAULT_NETWORK } from "../../src/config";
+import { CacheStore } from "@/app/utils/indexer";
 
 export type WrapPeriod = "weekly" | "monthly" | "yearly";
 
@@ -31,6 +32,17 @@ export interface WrapResult {
 }
 
 type WrapStatus = "idle" | "loading" | "ready" | "error";
+
+// In-memory cache for API results
+let cacheStore: CacheStore = {};
+
+export function getCacheStore(): CacheStore {
+  return cacheStore;
+}
+
+export function resetCache(): void {
+  cacheStore = {};
+}
 
 interface WrapStoreState {
   address: string | null;
@@ -72,4 +84,3 @@ export const useWrapStore = create<WrapStoreState>((set) => ({
       result: null,
     }),
 }));
-
