@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { AssetDisplay } from "@/app/components/AssetDisplay";
 
 export default function TestAPIPage() {
   type Dapp = {
@@ -26,7 +27,7 @@ export default function TestAPIPage() {
   };
 
   const [accountId, setAccountId] = useState(
-    "GBRPYHIL2CI3WHZDTOOQFC6EB4CGQONFCIUQG74P3UDMQ74P6C6DJCCEF",
+    "GBUQWP3BOUZX34ULNQG23RQ6F4YUSXHTQAJS2Y47TCM7QUIE2DBNHJQ",
   );
   const [network, setNetwork] = useState<"mainnet" | "testnet">("testnet");
   const [period, setPeriod] = useState<
@@ -171,10 +172,17 @@ export default function TestAPIPage() {
                   <span className="font-semibold">Total Volume:</span>{" "}
                   {result.totalVolume.toFixed(2)} XLM
                 </p>
-                <p>
+                <div className="flex items-center gap-2 text-sm text-green-400/80 font-mono">
                   <span className="font-semibold">Most Active Asset:</span>{" "}
-                  {result.mostActiveAsset}
-                </p>
+                  {/* {result.mostActiveAsset} */}
+                  <AssetDisplay
+                    code={result.mostActiveAsset}
+                    showLogo={true}
+                    showCode={true}
+                    showFullName={true}
+                    size="sm"
+                  />
+                </div>
                 <p>
                   <span className="font-semibold">Contract Calls:</span>{" "}
                   {result.contractCalls}
@@ -235,7 +243,8 @@ export default function TestAPIPage() {
             <li>• Select mainnet or testnet network</li>
             <li>• Select a wrap period (7, 30, or 365 days)</li>
             <li>
-              • Click &quot;Test API&quot; to fetch real blockchain data from Horizon
+              • Click &quot;Test API&quot; to fetch real blockchain data from
+              Horizon
             </li>
             <li>
               • Results will show transaction metrics, dapps, and vibes detected
@@ -260,12 +269,12 @@ export default function TestAPIPage() {
             <button
               onClick={() =>
                 setAccountId(
-                  "GBRPYHIL2CI3WHZDTOOQFC6EB4CGQONFCIUQG74P3UDMQ74P6C6DJCCEF",
+                  "GBUQWP3BOUZX34ULNQG23RQ6F4YUSXHTQAJS2Y47TCM7QUIE2DBNHJQ",
                 )
               }
               className="w-full text-left p-3 bg-white/5 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-all truncate text-xs font-mono"
             >
-              GBRPYHIL2CI3WHZDTOOQFC6EB4CGQONFCIUQG74P3UDMQ74P6C6DJCCEF
+              GBUQWP3BOUZX34ULNQG23RQ6F4YUSXHTQAJS2Y47TCM7QUIE2DBNHJQ
             </button>
           </div>
           <p className="text-white/40 text-xs mt-3">
