@@ -7,15 +7,10 @@
  * @module fullFlow.test
  */
 
-import { create } from 'zustand';
-import { StrKey } from 'stellar-sdk';
 import {
     toScVal,
     fromScVal,
-    addressToScVal,
-    stringToScVal,
     numberToScValU32,
-    numberToScValU64,
 } from '../../../src/utils/sorobanConverter';
 import {
     validateIndexedStats,

@@ -7,8 +7,8 @@
  */
 
 import { validateStellarAddress } from '../validateStellarAddress';
-import { validateIndexedStats, buildContractArgs, type ContractStatsInput } from '../contractArgsBuilder';
-import { toScVal, numberToScValU32, numberToScValU64, stringToScVal, stringToScValSymbol, addressToScVal, U32_MAX, U64_MAX, I32_MAX, I32_MIN } from '../sorobanConverter';
+import { validateIndexedStats, buildContractArgs} from '../contractArgsBuilder';
+import {  numberToScValU32, numberToScValU64, stringToScVal, stringToScValSymbol, addressToScVal, U32_MAX, U64_MAX} from '../sorobanConverter';
 import { parseNetworkParam } from '../networkUtils';
 import { useWrapperStore } from '../../store/useWrapperStore';
 
