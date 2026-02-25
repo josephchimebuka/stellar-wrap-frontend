@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import { DevTool } from "./components/DevTool";
 import { Toaster } from "sonner";
 import { SoundManager } from "./components/SoundManager";
+import { RateLimitBanner } from "./components/RateLimitBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <SoundManager />
+          <RateLimitBanner />
         </Providers>
         <DevTool />
         <Toaster position="top-right" richColors />
