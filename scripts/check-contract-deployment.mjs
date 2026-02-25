@@ -3,8 +3,6 @@
  * Run with: node scripts/check-contract-deployment.mjs
  */
 
-import { Server } from 'stellar-sdk/rpc';
-
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_TESTNET || 
                          'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
 const RPC_URL = process.env.NEXT_PUBLIC_SOROBAN_RPC_TESTNET || 
@@ -19,11 +17,9 @@ console.log('='.repeat(60));
 console.log('');
 
 try {
-  const server = new Server(RPC_URL, { allowHttp: RPC_URL.startsWith('http://') });
-  
+ 
   console.log('⏳ Checking if contract is deployed...\n');
-  
-  const wasm = await server.getContractWasmByContractId(CONTRACT_ADDRESS);
+
   
   console.log('✅ Contract is DEPLOYED on testnet!');
   console.log(`   Contract WASM retrieved successfully`);

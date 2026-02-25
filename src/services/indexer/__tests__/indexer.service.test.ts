@@ -12,8 +12,6 @@ import type { IndexerService } from '../types';
 import type { Network } from '../../../config';
 import {
   createMockIndexedTransaction,
-  createTransactionsInTimeframe,
-  createTransactionsOutsideTimeframe,
 } from '../../__tests__/test-utils';
 import {
   EMPTY_TRANSACTIONS,

@@ -6,7 +6,7 @@
  * @module validateStellarAddress.test
  */
 
-import { validateStellarAddress, type ValidationResult } from '../validateStellarAddress';
+import { validateStellarAddress} from '../validateStellarAddress';
 
 // ─── Test Helpers ───────────────────────────────────────────────────────────
 

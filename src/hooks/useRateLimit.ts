@@ -9,9 +9,11 @@ export function useRateLimit() {
     const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
 
     useEffect(() => {
+        // Guard: clear countdown when not rate limited
         if (!isRateLimited || !resetTime) {
-            setSecondsRemaining(null);
-            return;
+            // Use a microtask to avoid synchronous setState inside the effect body
+            const timer = setTimeout(() => setSecondsRemaining(null), 0);
+            return () => clearTimeout(timer);
         }
 
         const updateCountdown = () => {
@@ -29,6 +31,6 @@ export function useRateLimit() {
         isRateLimited,
         secondsRemaining,
         retryAttempt,
-        message
+        message,
     };
 }

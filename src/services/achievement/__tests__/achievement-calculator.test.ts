@@ -12,7 +12,6 @@ import type { AchievementCalculator } from '../types';
 import type { IndexedTransaction } from '../../indexer/types';
 import {
   createMockPaymentOperation,
-  createMockContractOperation,
   createMockExtendFootprintOperation,
   createMultiAssetTransactions,
   createContractCallTransactions,

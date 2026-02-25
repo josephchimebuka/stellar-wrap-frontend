@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, RotateCcw, Clock } from 'lucide-react';
-import { useRateLimit } from '../hooks/useRateLimit';
+import { useRateLimit } from '@/src/hooks/useRateLimit';
 
 export function RateLimitBanner() {
     const { isRateLimited, secondsRemaining, retryAttempt, message } = useRateLimit();

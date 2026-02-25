@@ -9,7 +9,7 @@
 import { validateStellarAddress } from '../validateStellarAddress';
 import { validateIndexedStats, buildContractArgs, type ContractStatsInput } from '../contractArgsBuilder';
 import { toScVal, fromScVal } from '../sorobanConverter';
-import { getRpcEndpoint, parseNetworkParam, getNetworkDisplayName } from '../networkUtils';
+import { getRpcEndpoint, parseNetworkParam} from '../networkUtils';
 import { useWrapperStore } from '../../store/useWrapperStore';
 import { GOLDEN_USER } from '../../data/mockData';
 

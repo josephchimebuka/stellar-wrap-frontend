@@ -1,21 +1,23 @@
 /**
  * Helper script to check contract address configuration
- * Run with: node scripts/check-contract-config.js
+ * Run with: node scripts/check-contract-config.mjs
  */
 
-// Load environment variables (Next.js style)
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Try to load .env.local or .env
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load .env.local or .env
 const envFiles = ['.env.local', '.env'];
-let envVars = {};
+const envVars = {};
 
-envFiles.forEach(file => {
+envFiles.forEach((file) => {
   const envPath = path.join(process.cwd(), file);
   if (fs.existsSync(envPath)) {
     const content = fs.readFileSync(envPath, 'utf8');
-    content.split('\n').forEach(line => {
+    content.split('\n').forEach((line) => {
       const match = line.match(/^([^=:#]+)=(.*)$/);
       if (match) {
         const key = match[1].trim();
@@ -26,19 +28,21 @@ envFiles.forEach(file => {
   }
 });
 
-// Merge with process.env (environment variables take precedence)
+// Environment variables take precedence
 const allEnv = { ...envVars, ...process.env };
 
 console.log('🔍 Contract Address Configuration Check\n');
-console.log('=' .repeat(60));
+console.log('='.repeat(60));
 
-// Check for contract addresses
-const contractAddressMainnet = allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS_MAINNET || 
-                                allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS || 
-                                'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-const contractAddressTestnet = allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS_TESTNET || 
-                                allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS || 
-                                'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+const contractAddressMainnet =
+  allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS_MAINNET ??
+  allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS ??
+  'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+const contractAddressTestnet =
+  allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS_TESTNET ??
+  allEnv.NEXT_PUBLIC_CONTRACT_ADDRESS ??
+  'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
 console.log('\n📋 Mainnet Configuration:');
 console.log(`   Contract Address: ${contractAddressMainnet}`);
@@ -58,18 +62,15 @@ if (contractAddressTestnet.startsWith('CAAAAAAAA')) {
   console.log('   ✅ Using configured contract address');
 }
 
-// Check Soroban RPC endpoints
-const sorobanRpcMainnet = allEnv.NEXT_PUBLIC_SOROBAN_RPC_URL_MAINNET || 
-                          'https://soroban-rpc.mainnet.stellar.org';
-const sorobanRpcTestnet = allEnv.NEXT_PUBLIC_SOROBAN_RPC_URL_TESTNET || 
-                          'https://soroban-rpc.testnet.stellar.org';
+const sorobanRpcMainnet =
+  allEnv.NEXT_PUBLIC_SOROBAN_RPC_URL_MAINNET ?? 'https://soroban-rpc.mainnet.stellar.org';
+const sorobanRpcTestnet =
+  allEnv.NEXT_PUBLIC_SOROBAN_RPC_URL_TESTNET ?? 'https://soroban-rpc.testnet.stellar.org';
 
 console.log('\n🌐 Soroban RPC Endpoints:');
 console.log(`   Mainnet: ${sorobanRpcMainnet}`);
 console.log(`   Testnet: ${sorobanRpcTestnet}`);
 
-// Show environment variable status
-console.log('\n📝 Environment Variables Found:');
 const contractVars = [
   'NEXT_PUBLIC_CONTRACT_ADDRESS',
   'NEXT_PUBLIC_CONTRACT_ADDRESS_MAINNET',
@@ -78,10 +79,13 @@ const contractVars = [
   'NEXT_PUBLIC_SOROBAN_RPC_URL_TESTNET',
 ];
 
-contractVars.forEach(varName => {
+console.log('\n📝 Environment Variables Found:');
+contractVars.forEach((varName) => {
   const value = allEnv[varName];
   if (value) {
-    console.log(`   ✅ ${varName} = ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
+    console.log(
+      `   ✅ ${varName} = ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`,
+    );
   } else {
     console.log(`   ❌ ${varName} (not set)`);
   }

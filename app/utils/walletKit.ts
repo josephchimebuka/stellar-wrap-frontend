@@ -9,7 +9,6 @@ import {
   ContractValidationError,
 } from "./contractErrors";
 import { mintWrap as contractMintWrap, type MintWrapOptions, type TransactionObserver } from "../../src/services/contractBridge";
-import { useWrapStore } from "../store/wrapStore";
 
 if (
   typeof process !== "undefined" &&
@@ -145,8 +144,7 @@ export async function mintWrap(params: MintWrapParams): Promise<string> {
     // Get stats if not provided
     let finalStats = stats;
     if (!finalStats) {
-      // Try to get from store first (if available)
-      const store = useWrapStore.getState();
+    
       // Fetch from API if not in store
       finalStats = await fetchIndexedStats(userAddress, network);
     }

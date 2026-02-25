@@ -1,19 +1,24 @@
-import { Horizon, Server } from 'stellar-sdk';
+import { Horizon } from 'stellar-sdk';
 import { Network, RPC_ENDPOINTS } from '../config';
 import { horizonQueue } from '../utils/horizonRequestQueue';
 
-/**
- * Simple cache for API responses
- */
+
+type HorizonServer = InstanceType<typeof Horizon.Server>;
+
+interface CacheEntry {
+    data: unknown;
+    timestamp: number;
+}
+
 class ResponseCache {
-    private cache = new Map<string, { data: any; timestamp: number }>();
+    private cache = new Map<string, CacheEntry>();
     private ttl = 5 * 60 * 1000; // 5 minutes
 
-    set(key: string, data: any) {
+    set(key: string, data: unknown) {
         this.cache.set(key, { data, timestamp: Date.now() });
     }
 
-    get(key: string) {
+    get(key: string): unknown | null {
         const entry = this.cache.get(key);
         if (!entry) return null;
         if (Date.now() - entry.timestamp > this.ttl) {
@@ -30,26 +35,22 @@ class ResponseCache {
 
 const cache = new ResponseCache();
 
-/**
- * Service to fetch data from Stellar Horizon with rate limiting and caching
- */
-export class HorizonIndexerService {
-    private servers: Record<string, Server> = {};
 
-    private getServer(network: Network): Server {
+
+export class HorizonIndexerService {
+    private servers: Partial<Record<Network, HorizonServer>> = {};
+
+    private getServer(network: Network): HorizonServer {
         if (!this.servers[network]) {
-            this.servers[network] = new Server(RPC_ENDPOINTS[network]);
+            this.servers[network] = new Horizon.Server(RPC_ENDPOINTS[network]);
         }
-        return this.servers[network];
+        return this.servers[network]!;
     }
 
-    /**
-     * Fetches account details
-     */
     async getAccount(address: string, network: Network): Promise<Horizon.AccountResponse> {
         const cacheKey = `account:${network}:${address}`;
         const cached = cache.get(cacheKey);
-        if (cached) return cached;
+        if (cached) return cached as Horizon.AccountResponse;
 
         const server = this.getServer(network);
         const result = await horizonQueue.enqueue(() => server.loadAccount(address));
@@ -58,35 +59,47 @@ export class HorizonIndexerService {
         return result;
     }
 
-    /**
-     * Fetches payments for an account
-     */
-    async getPayments(address: string, network: Network, limit = 100): Promise<Horizon.ServerApi.PaymentOperationResponse[]> {
+    async getPayments(
+        address: string,
+        network: Network,
+        limit = 100,
+    ): Promise<Horizon.ServerApi.PaymentOperationRecord[]> {
         const cacheKey = `payments:${network}:${address}:${limit}`;
         const cached = cache.get(cacheKey);
-        if (cached) return cached;
+        if (cached) return cached as Horizon.ServerApi.PaymentOperationRecord[];
 
         const server = this.getServer(network);
         const result = await horizonQueue.enqueue(async () => {
-            const response = await server.payments().forAccount(address).limit(limit).order('desc').call();
-            return response.records;
+            const response = await server
+                .payments()
+                .forAccount(address)
+                .limit(limit)
+                .order('desc')
+                .call();
+            return response.records as Horizon.ServerApi.PaymentOperationRecord[];
         });
 
         cache.set(cacheKey, result);
         return result;
     }
 
-    /**
-     * Fetches transactions for an account
-     */
-    async getTransactions(address: string, network: Network, limit = 100): Promise<Horizon.ServerApi.TransactionResponse[]> {
+    async getTransactions(
+        address: string,
+        network: Network,
+        limit = 100,
+    ): Promise<Horizon.ServerApi.TransactionRecord[]> {
         const cacheKey = `transactions:${network}:${address}:${limit}`;
         const cached = cache.get(cacheKey);
-        if (cached) return cached;
+        if (cached) return cached as Horizon.ServerApi.TransactionRecord[];
 
         const server = this.getServer(network);
         const result = await horizonQueue.enqueue(async () => {
-            const response = await server.transactions().forAccount(address).limit(limit).order('desc').call();
+            const response = await server
+                .transactions()
+                .forAccount(address)
+                .limit(limit)
+                .order('desc')
+                .call();
             return response.records;
         });
 
@@ -94,13 +107,9 @@ export class HorizonIndexerService {
         return result;
     }
 
-    /**
-     * Clear the indexer cache
-     */
     clearCache() {
         cache.clear();
     }
 }
 
-// Export singleton instance
 export const horizonIndexer = new HorizonIndexerService();
