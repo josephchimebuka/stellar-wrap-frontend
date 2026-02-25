@@ -73,6 +73,17 @@ export function ShareCard({
     const observer = (state: string, data?: unknown) => {
       setMintState(state);
       console.log("Transaction state:", state, data);
+      
+      // Handle simulation results
+      if (state === 'simulating' && data && typeof data === 'object' && 'simulation' in data) {
+        const simulation = (data as { simulation: { success?: boolean; estimatedFee?: number } }).simulation;
+        if (simulation?.success && simulation?.estimatedFee) {
+          // Show simulation success with fee estimate
+          toast.info("Transaction simulation successful", {
+            description: `Estimated fee: ${simulation.estimatedFee.toFixed(7)} XLM`,
+          });
+        }
+      }
     };
 
     try {
