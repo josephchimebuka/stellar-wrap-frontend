@@ -27,9 +27,16 @@ export interface IndexerResult {
   vibes: VibeTag[];
 }
 
+/** Cache entry version for schema migrations and validation */
+export const CACHE_VERSION = 1;
+
+/** Default TTL in minutes (1 hour). Configurable for cache validity. */
+export const CACHE_TTL_MINUTES = 60;
+
 export interface CacheEntry {
   result: IndexerResult;
   timestamp: number;
+  version?: number;
 }
 
 export interface CacheStore {
@@ -58,9 +65,17 @@ export function getCacheKey(
 
 export function isCacheValid(
   entry: CacheEntry,
-  ttlMinutes: number = 5,
+  ttlMinutes: number = CACHE_TTL_MINUTES,
 ): boolean {
   const now = Date.now();
   const age = now - entry.timestamp;
   return age < ttlMinutes * 60 * 1000;
+}
+
+/** Result of indexAccount when cache is used; for UI (badge, age, refresh). */
+export interface IndexerResultWithMeta {
+  result: IndexerResult;
+  fromCache: boolean;
+  cacheTimestamp?: number;
+  refreshingInBackground?: boolean;
 }
