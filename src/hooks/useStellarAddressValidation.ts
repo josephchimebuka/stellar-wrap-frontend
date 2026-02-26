@@ -9,6 +9,60 @@ interface UseStellarAddressValidationProps {
   debounceMs?: number;
 }
 
+interface ValidationCacheEntry {
+  state: ValidationState;
+  error: string | null;
+  timestamp: number;
+}
+
+// Validation cache with TTL (5 minutes)
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const validationCache = new Map<string, ValidationCacheEntry>();
+
+/**
+ * Clear cache entries for a specific network when network changes
+ */
+const clearCacheForNetwork = (network: Network) => {
+  const now = Date.now();
+  // Clear all expired entries and reset for network change
+  validationCache.clear();
+};
+
+/**
+ * Get cached validation result if available and not expired
+ */
+const getCachedValidation = (address: string, network: Network): ValidationCacheEntry | null => {
+  const cacheKey = `${network}:${address}`;
+  const cached = validationCache.get(cacheKey);
+  
+  if (!cached) return null;
+  
+  const now = Date.now();
+  if (now - cached.timestamp > CACHE_TTL) {
+    validationCache.delete(cacheKey);
+    return null;
+  }
+  
+  return cached;
+};
+
+/**
+ * Store validation result in cache
+ */
+const setCachedValidation = (
+  address: string, 
+  network: Network, 
+  state: ValidationState, 
+  error: string | null
+) => {
+  const cacheKey = `${network}:${address}`;
+  validationCache.set(cacheKey, {
+    state,
+    error,
+    timestamp: Date.now()
+  });
+};
+
 export const useStellarAddressValidation = ({
   initialAddress = '',
   network = 'mainnet' as Network,
@@ -18,7 +72,21 @@ export const useStellarAddressValidation = ({
   const [debouncedAddress, setDebouncedAddress] = useState(initialAddress);
   const [validationState, setValidationState] = useState<ValidationState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const timerRef = useRef<NodeJS.Timeout>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const previousNetworkRef = useRef<Network>(network);
+
+  // Clear cache when network changes
+  useEffect(() => {
+    if (previousNetworkRef.current !== network) {
+      clearCacheForNetwork(network);
+      previousNetworkRef.current = network;
+      
+      // Re-validate current address with new network
+      if (debouncedAddress) {
+        setValidationState('validating');
+      }
+    }
+  }, [network, debouncedAddress]);
 
   // Auto-format address: remove spaces and uppercase
   const formatAddress = (rawAddress: string) => {
@@ -41,6 +109,15 @@ export const useStellarAddressValidation = ({
       return;
     }
 
+    // Check cache first for instant feedback
+    const cached = getCachedValidation(formatted, network);
+    if (cached) {
+      setValidationState(cached.state);
+      setErrorMessage(cached.error);
+      setDebouncedAddress(formatted);
+      return;
+    }
+
     // Set formatting validation state while typing
     setValidationState('validating');
     setErrorMessage(null);
@@ -49,7 +126,7 @@ export const useStellarAddressValidation = ({
     timerRef.current = setTimeout(() => {
       setDebouncedAddress(formatted);
     }, debounceMs);
-  }, [debounceMs]);
+  }, [debounceMs, network]);
 
   // Network check effect
   useEffect(() => {
@@ -58,6 +135,14 @@ export const useStellarAddressValidation = ({
     let isMounted = true;
 
     const validateAccountNetwork = async () => {
+      // Check cache first
+      const cached = getCachedValidation(debouncedAddress, network);
+      if (cached && isMounted) {
+        setValidationState(cached.state);
+        setErrorMessage(cached.error);
+        return;
+      }
+
       // 1. Format validation first
       const formatResult = validateStellarAddress(debouncedAddress, network);
       
@@ -65,11 +150,13 @@ export const useStellarAddressValidation = ({
 
       if (!formatResult.isValid) {
         setValidationState(formatResult.state);
-        if (formatResult.error) setErrorMessage(formatResult.error);
+        const errorMsg = formatResult.error || 'Invalid address format';
+        setErrorMessage(errorMsg);
+        setCachedValidation(debouncedAddress, network, formatResult.state, errorMsg);
         return;
       }
 
-      // 2. Network Check
+      // 2. Network existence check
       setValidationState('validating');
       setErrorMessage(null);
 
@@ -77,17 +164,14 @@ export const useStellarAddressValidation = ({
         const rpcUrl = RPC_ENDPOINTS[network];
         const server = new Horizon.Server(rpcUrl);
         
-        // Use Horizon API call to check if account exists
+        // Use Horizon API call to check if account exists on the network
         await server.loadAccount(debouncedAddress);
         
         if (!isMounted) return;
-        
-        // Optional: Check if account has 0 transactions (we will consider valid but could warn)
-        // const operations = await server.operations().forAccount(debouncedAddress).call();
-        // if (operations.records.length === 0) { ... }
 
         setValidationState('valid');
         setErrorMessage(null);
+        setCachedValidation(debouncedAddress, network, 'valid', null);
         
       } catch (error) {
         if (!isMounted) return;
@@ -96,11 +180,15 @@ export const useStellarAddressValidation = ({
         
         const err = error as { response?: { status?: number } };
         if (err?.response?.status === 404) {
+          const errorMsg = `Account not found on ${network === 'mainnet' ? 'Stellar Mainnet' : 'Stellar Testnet'}`;
           setValidationState('not-found');
-          setErrorMessage('Account not found on Stellar network');
+          setErrorMessage(errorMsg);
+          setCachedValidation(debouncedAddress, network, 'not-found', errorMsg);
         } else {
+          const errorMsg = 'Unable to verify account on Stellar network';
           setValidationState('error');
-          setErrorMessage('Unable to connect to Stellar network');
+          setErrorMessage(errorMsg);
+          // Don't cache network errors as they might be temporary
         }
       }
     };

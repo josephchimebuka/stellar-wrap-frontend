@@ -451,6 +451,8 @@ export default function ConnectPage() {
                     <CheckCircle className="w-5 h-5 text-green-500" />
                   </motion.div>
                 ) : validationState === "invalid" ||
+                  validationState === "invalid-format" ||
+                  validationState === "wrong-network" ||
                   validationState === "not-found" ||
                   validationState === "error" ? (
                   <motion.div
@@ -524,19 +526,19 @@ export default function ConnectPage() {
               ref={connectButtonRef}
               onClick={handleConnect}
               onKeyDown={handleConnectKeyDown}
-              disabled={!walletAddress.trim() || isConnecting}
+              disabled={!walletAddress.trim() || isConnecting || !isValid}
               className="w-full relative group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
               whileHover={{
-                scale: !walletAddress.trim() || isConnecting ? 1 : 1.02,
+                scale: !walletAddress.trim() || isConnecting || !isValid ? 1 : 1.02,
               }}
               whileTap={{
-                scale: !walletAddress.trim() || isConnecting ? 1 : 0.98,
+                scale: !walletAddress.trim() || isConnecting || !isValid ? 1 : 0.98,
               }}
               tabIndex={0}
               aria-label={
                 isConnecting ? "Connecting wallet" : "Start wrapping process"
               }
-              aria-disabled={!walletAddress.trim() || isConnecting}
+              aria-disabled={!walletAddress.trim() || isConnecting || !isValid}
               role="button"
             >
               <motion.div
@@ -561,7 +563,7 @@ export default function ConnectPage() {
                     : "var(--color-theme-primary)",
                   color: "#000000",
                   cursor:
-                    !walletAddress.trim() || isConnecting
+                    !walletAddress.trim() || isConnecting || !isValid
                       ? "not-allowed"
                       : "pointer",
                 }}
