@@ -276,7 +276,8 @@ export async function indexAccountMultiTimeframe(
   settled.forEach((outcome, i) => {
     const tf = timeframes[i];
     if (outcome.status === "fulfilled") {
-      results[tf] = { status: "success", data: outcome.value, error: null };
+      // indexAccount returns IndexerResultWithMeta, extract the result
+      results[tf] = { status: "success", data: outcome.value.result, error: null };
     } else {
       const msg =
         outcome.reason instanceof Error
