@@ -53,28 +53,6 @@ interface TransactionCategories {
 }
 
 /**
- * Timeframe statistics for comparison
- */
-interface TimeframeStats {
-  period: string; // "1 week", "2 weeks", "1 month"
-  transactions: number;
-  volume: number;
-  startDate: Date;
-  endDate: Date;
-}
-
-/**
- * Additional metrics calculated from transactions
- */
-interface AdditionalMetrics {
-  averageTransactionValue: number;
-  largestTransaction: number;
-  transactionFrequency: number; // transactions per day
-  uniqueCounterparties: Set<string>;
-  mostActiveDay: string | null;
-}
-
-/**
  * DApp detection keywords for common platforms
  */
 const DAPP_KEYWORDS = {

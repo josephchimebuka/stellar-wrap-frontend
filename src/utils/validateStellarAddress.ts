@@ -1,5 +1,5 @@
 import { StrKey } from 'stellar-sdk';
-import { Network, NETWORKS } from '../config';
+import { Network } from '../config';
 
 export type ValidationState = 'idle' | 'validating' | 'valid' | 'invalid' | 'invalid-format' | 'wrong-network' | 'not-found' | 'indexing' | 'error';
 
@@ -15,7 +15,7 @@ export interface ValidationResult {
  * @param network The current network context (mainnet/testnet)
  * @returns ValidationResult containing status and optional error message
  */
-export const validateStellarAddress = (address: string, network: Network): ValidationResult => {
+export const validateStellarAddress = (address: string, _network: Network): ValidationResult => {
   if (!address || address.trim() === '') {
     return {
       isValid: false,
@@ -96,7 +96,7 @@ export const validateStellarAddress = (address: string, network: Network): Valid
  * @param network The expected network
  * @returns true if prefix is valid for the network
  */
-export const isAddressPrefixValidForNetwork = (address: string, network: Network): boolean => {
+export const isAddressPrefixValidForNetwork = (address: string, _network: Network): boolean => {
   if (!address || address.length === 0) return false;
   
   const prefix = address[0];

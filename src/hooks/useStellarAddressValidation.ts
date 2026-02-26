@@ -22,8 +22,7 @@ const validationCache = new Map<string, ValidationCacheEntry>();
 /**
  * Clear cache entries for a specific network when network changes
  */
-const clearCacheForNetwork = (network: Network) => {
-  const now = Date.now();
+const clearCacheForNetwork = (_network: Network) => {
   // Clear all expired entries and reset for network change
   validationCache.clear();
 };
@@ -80,13 +79,10 @@ export const useStellarAddressValidation = ({
     if (previousNetworkRef.current !== network) {
       clearCacheForNetwork(network);
       previousNetworkRef.current = network;
-      
-      // Re-validate current address with new network
-      if (debouncedAddress) {
-        setValidationState('validating');
-      }
+      // Note: Re-validation happens automatically via the validation effect
+      // since 'network' is in its dependency array
     }
-  }, [network, debouncedAddress]);
+  }, [network]);
 
   // Auto-format address: remove spaces and uppercase
   const formatAddress = (rawAddress: string) => {
