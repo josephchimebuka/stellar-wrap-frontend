@@ -306,7 +306,6 @@ export function IndexingSkeleton({
             {STEP_ORDER.map((step, index) => {
               const isCompleted = completedSteps > index;
               const isCurrentStep = currentStep === step;
-              const isPending = completedSteps <= index && !isCurrentStep;
 
               return (
                 <motion.div

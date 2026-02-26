@@ -319,18 +319,24 @@ async function runIndexingInternal(
         (Array.isArray(txData.operations) ? txData.operations : []).forEach(
           (op) => {
             const opData = op as Record<string, unknown>;
-      // Emit metrics update - asset count
-      emit(() =>
-        emitter.emitMetricsUpdate({
-          assetCount: map.size,
-        }),
-      );
             if (opData.type === "payment") {
               const key = String(opData.asset_code || "native");
               map.set(key, (map.get(key) || 0) + 1);
             }
           },
         );
+      });
+      // Emit metrics update - asset count
+      emit(() =>
+        emitter.emitMetricsUpdate({
+          assetCount: map.size,
+        }),
+      );
+      return map;
+    }, background);
+
+    currentEmittedStep = "counting-contracts";
+    emit(() => emitter.emitStepChange("counting-contracts"));
     const contractCount = await animateStep("counting-contracts", emitter, () => {
       const count = filteredTransactions.reduce((count: number, tx) => {
         const txData = tx as Record<string, unknown>;
@@ -349,13 +355,7 @@ async function runIndexingInternal(
         }),
       );
       return count;
-    },       (Array.isArray(txData.operations) ? txData.operations : []).filter(
-            (op) =>
-              (op as Record<string, unknown>).type === "invoke_host_function",
-          ).length
-        );
-      }, 0),
-    background);
+    }, background);
 
     currentEmittedStep = "finalizing";
     emit(() => emitter.emitStepChange("finalizing"));

@@ -125,11 +125,6 @@ export class IndexerEventEmitter extends EventEmitter {
     this.on("indexing-complete", ({ _data }) => {
       // Clear persisted state on successful completion
       store.getState().clearPersistedState();
-      // on("metrics-update", ({ metrics }) => {
-      store.getState().updateMetrics(metrics);
-    });
-
-    this.You can also trigger additional actions here if needed
     });
 
     this.on("indexing-cancelled", () => {
