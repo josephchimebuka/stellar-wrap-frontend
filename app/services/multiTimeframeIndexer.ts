@@ -125,17 +125,17 @@ function buildComparison(
 
   // Most active timeframe by volume
   const volumeEntries: { tf: Timeframe; val: number }[] = [
-    { tf: "1w", val: vol1w },
-    { tf: "2w", val: vol2w },
-    { tf: "1m", val: vol1m },
+    { tf: "1w" as Timeframe, val: vol1w },
+    { tf: "2w" as Timeframe, val: vol2w },
+    { tf: "1m" as Timeframe, val: vol1m },
   ].filter((e) =>
     e.tf === "1w" ? r1w !== null : e.tf === "2w" ? r2w !== null : r1m !== null
   );
 
   const txEntries: { tf: Timeframe; val: number }[] = [
-    { tf: "1w", val: tx1w },
-    { tf: "2w", val: tx2w },
-    { tf: "1m", val: tx1m },
+    { tf: "1w" as Timeframe, val: tx1w },
+    { tf: "2w" as Timeframe, val: tx2w },
+    { tf: "1m" as Timeframe, val: tx1m },
   ].filter((e) =>
     e.tf === "1w" ? r1w !== null : e.tf === "2w" ? r2w !== null : r1m !== null
   );
