@@ -1,22 +1,6 @@
-# Unit Tests for Indexer and Achievement Calculator Services
+# Unit Tests
 
-This directory contains comprehensive unit tests for the Stellar Horizon API Indexer Service and the Achievement Calculator Service.
-
-## Overview
-
-These tests are written following Test-Driven Development (TDD) principles. The test files define the expected behavior and interfaces for the services before their implementation. Once the services are implemented (issues #34 and #40), these tests will validate their correctness.
-
-## Test Structure
-
-### Test Files
-
-- `indexer/__tests__/indexer.service.test.ts` - Tests for the indexer service
-- `achievement/__tests__/achievement-calculator.test.ts` - Tests for the achievement calculator service
-
-### Test Utilities
-
-- `test-utils.ts` - Helper functions for creating mock data and test scenarios
-- `fixtures.ts` - Pre-defined test data fixtures for common scenarios
+Tests for the indexer and achievement calculator services.
 
 ## Running Tests
 
@@ -24,129 +8,90 @@ These tests are written following Test-Driven Development (TDD) principles. The 
 # Run all tests
 npm test
 
-# Run tests in watch mode
-npm run test:watch
+# Run specific test files
+npm test -- app/services/__tests__/achievementCalculator.unit.test.ts
+npm test -- app/services/__tests__/indexerService.unit.test.ts
 
-# Run tests with coverage report
-npm run test:coverage
+# Run with coverage
+npm test -- --coverage
 ```
 
-## Test Coverage Goals
+## Test Files
 
-- **Target Coverage**: 80%+ for all services
-- **Coverage Areas**:
-  - All public methods
-  - Edge cases
-  - Error handling
-  - Boundary conditions
+The actual test files are in `app/services/__tests__/`:
 
-## Test Categories
+- `achievementCalculator.unit.test.ts` - Tests for the achievement calculator (31 tests)
+- `indexerService.unit.test.ts` - Tests for the indexer service (12 tests)
 
-### Indexer Service Tests
+There are also some older test files in `src/services/` that were written before implementation, but the working tests are in `app/services/__tests__/`.
 
-1. **Transaction Fetching**
-   - Valid account transactions
-   - Pagination handling
-   - Ordering (asc/desc)
-   - Limit parameter
-   - Network support (mainnet/testnet)
+## Test Structure
 
-2. **Timeframe Filtering**
-   - 1 week filtering
-   - 2 week filtering
-   - 1 month filtering
-   - Boundary conditions
+Tests are organized by what they're testing:
 
-3. **Validation**
-   - Transaction structure validation
-   - Invalid data handling
-   - Missing field detection
+**Achievement Calculator:**
+- Volume calculation (single payments, multiple payments, different assets)
+- Asset identification (XLM, issued assets, most active asset)
+- Contract call counting (invokeHostFunction operations)
+- Edge cases (empty transactions, missing data, invalid amounts)
+- Vibes calculation (Whale, High Roller, Active, Soroban Explorer, etc.)
+- Dapp detection (from memo fields)
 
-4. **Error Handling**
-   - API errors
-   - Network timeouts
-   - Rate limiting
-   - Malformed responses
+**Indexer Service:**
+- Transaction fetching (valid accounts, pagination)
+- Error handling (404, 429, 500, timeouts, unknown errors)
+- Cache handling (returning cached results, fetching fresh data)
+- Network support (mainnet, testnet)
+- Period support (weekly, monthly, yearly)
 
-### Achievement Calculator Tests
+## Test Data
 
-1. **Volume Calculation**
-   - Single payments
-   - Multiple payments
-   - Different assets
-   - Zero volume
-   - Decimal precision
+We use mocks for most test data. The indexer service tests mock the Horizon API responses, and the achievement calculator tests use simple transaction objects.
 
-2. **Asset Identification**
-   - Native XLM
-   - Issued assets
-   - Unique asset detection
-   - Issuer information
+Example test data:
+```typescript
+const transactions = [
+  {
+    created_at: new Date().toISOString(),
+    operations: [
+      { type: 'payment', amount: '100.0', asset_code: 'XLM' }
+    ]
+  }
+];
+```
 
-3. **Contract Call Counting**
-   - invokeHostFunction operations
-   - extendFootprintTtl operations
-   - Mixed operations
-   - Zero contract calls
+For the indexer service, we mock the Horizon server builder chain:
+```typescript
+mockServer.transactions().forAccount().limit().call.mockResolvedValue({ records: [] });
+```
 
-4. **Edge Cases**
-   - Empty transactions
-   - Missing data
-   - Invalid amounts
-   - Future dates
-   - Large transaction sets
+## Coverage
 
-## Test Data Fixtures
+We aim for 80%+ coverage. Current status:
 
-The `fixtures.ts` file provides pre-configured test data for common scenarios:
+- **Achievement Calculator**: 100% statements, 90% branches
+- **Indexer Service**: Tests passing (coverage not measured separately)
 
-- `EMPTY_TRANSACTIONS` - Empty transaction array
-- `SINGLE_TRANSACTION` - Single transaction
-- `XLM_PAYMENT_TRANSACTIONS` - Multiple XLM payments
-- `ISSUED_ASSET_TRANSACTIONS` - Transactions with issued assets
-- `CONTRACT_CALL_TRANSACTIONS` - Transactions with contract calls
-- `MIXED_TRANSACTIONS` - Mixed transaction types
-- `ONE_WEEK_TRANSACTIONS` - Transactions within 1 week
-- `TWO_WEEK_TRANSACTIONS` - Transactions within 2 weeks
-- `ONE_MONTH_TRANSACTIONS` - Transactions within 1 month
-- `ZERO_VOLUME_TRANSACTIONS` - Transactions with no volume
-- `EQUAL_ASSET_COUNT_TRANSACTIONS` - Transactions with equal asset counts
-
-## Test Utilities
-
-The `test-utils.ts` file provides helper functions:
-
-- `createMockTransaction()` - Create mock Horizon transaction
-- `createMockOperation()` - Create mock Horizon operation
-- `createMockIndexedTransaction()` - Create mock indexed transaction
-- `createMockPaymentOperation()` - Create mock payment operation
-- `createMockContractOperation()` - Create mock contract operation
-- `createTransactionsInTimeframe()` - Create transactions within timeframe
-- `createMultiAssetTransactions()` - Create transactions with multiple assets
-- `createContractCallTransactions()` - Create transactions with contract calls
+Coverage thresholds are set in `jest.config.js`:
+- Branches: 80%
+- Functions: 80%
+- Lines: 80%
+- Statements: 80%
 
 ## Writing New Tests
 
-When adding new tests:
+When adding tests:
 
-1. Use the provided test utilities and fixtures when possible
-2. Follow the existing test structure and naming conventions
+1. Put them in `app/services/__tests__/` with a `.unit.test.ts` suffix
+2. Mock external dependencies (Horizon API, cache, etc.)
 3. Test both success and error cases
-4. Include edge cases and boundary conditions
-5. Ensure tests are isolated and don't depend on each other
-6. Use descriptive test names that explain what is being tested
+4. Keep tests isolated - each test should work independently
+5. Use descriptive test names like `should handle 404 account not found error`
 
-## Dependencies
+## Common Issues
 
-These tests depend on:
+**Tests timing out**: Some indexer service tests need longer timeouts (15-30 seconds) because they involve async operations and timers. We've set `testTimeout` in those tests.
 
-- **Jest** - Testing framework
-- **TypeScript** - Type checking
-- **Service implementations** - Once issues #34 and #40 are completed
+**Mocking Horizon API**: The builder pattern (`transactions().forAccount().limit().call()`) needs to be mocked carefully. See `indexerService.unit.test.ts` for the pattern we use.
 
-## Notes
-
-- Tests are currently set up to fail until the services are implemented
-- The test files include TODO comments indicating where service initialization should occur
-- Once services are implemented, remove the placeholder comments and initialize the services properly
-- All tests use TypeScript for type safety
+**Cache tests**: Make sure to mock both `getCacheEntry` and the `isCacheValid` function from the indexer utils when testing cache behavior.

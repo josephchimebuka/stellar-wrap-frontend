@@ -2,14 +2,14 @@
 import {
   Contract,
   Transaction,
-  FeeBumpTransaction,
   TransactionBuilder,
   xdr,
   BASE_FEE,
 } from 'stellar-sdk';
+import { Horizon } from '@stellar/stellar-sdk';
 import { Server, Api } from 'stellar-sdk/rpc';
 import { signTransaction } from '@stellar/freighter-api';
-import { Network, NETWORK_PASSPHRASES, SOROBAN_RPC_URLS } from '../config';
+import { Network, NETWORK_PASSPHRASES, SOROBAN_RPC_URLS, RPC_ENDPOINTS } from '../config';
 import { getContractAddress } from '../../config/contracts';
 import { buildContractArgs, type ContractStatsInput } from '../utils/contractArgsBuilder';
 
@@ -43,11 +43,68 @@ export interface TransactionError {
   originalError?: unknown;
 }
 
+/**
+ * Resource costs from simulation
+ */
+export interface SimulationCost {
+  /** CPU instructions */
+  cpuInsns: number;
+  /** Memory bytes */
+  memBytes: number;
+}
+
+/**
+ * Contract footprint from simulation
+ */
+export interface SimulationFootprint {
+  /** Read-only contract keys */
+  readOnly: string[];
+  /** Read-write contract keys */
+  readWrite: string[];
+}
+
+/**
+ * Detailed simulation result
+ */
+export interface SimulationResult {
+  /** Whether simulation succeeded */
+  success: boolean;
+  /** Error message if simulation failed */
+  error?: string;
+  /** Resource costs */
+  cost?: SimulationCost;
+  /** Contract footprint */
+  footprint?: SimulationFootprint;
+  /** Return value from contract (if successful) */
+  result?: unknown;
+  /** Estimated transaction fee in XLM */
+  estimatedFee?: number;
+  /** Account balance in XLM */
+  accountBalance?: number;
+  /** Whether restore preamble is required */
+  requiresRestore?: boolean;
+}
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+/** Maximum number of confirmation polling attempts */
 const MAX_CONFIRMATION_ATTEMPTS = 60;
 const CONFIRMATION_POLL_INTERVAL = 2000;
-const TRANSACTION_TIMEOUT = 120000;
 
+/** Transaction timeout (ms) */
+const TRANSACTION_TIMEOUT = 120000; // 2 minutes
 
+/** Simulation cache duration (ms) */
+const SIMULATION_CACHE_DURATION = 30000; // 30 seconds
+
+/** Simulation cache */
+const simulationCache = new Map<string, { result: SimulationResult; timestamp: number }>();
+
+// ─── Helper Functions ───────────────────────────────────────────────────────
+
+/**
+ * Creates a Soroban RPC server instance for the given network
+ */
 function createSorobanServer(network: Network): Server {
   const rpcUrl = SOROBAN_RPC_URLS[network];
   return new Server(rpcUrl, { allowHttp: rpcUrl.startsWith('http://') });
@@ -189,30 +246,201 @@ async function buildMintTransaction(
   return { transaction, contract };
 }
 
+/**
+ * Calculates estimated transaction fee from simulation
+ */
+function calculateEstimatedFee(simulation: { cost?: SimulationCost }, baseFee = 100): number {
+  // Base fee is in stroops (1 XLM = 10,000,000 stroops)
+  // Default base fee is 100 stroops (0.00001 XLM)
+  let estimatedFee = baseFee;
 
+  // Add resource costs if available
+  if (simulation.cost) {
+    // CPU instructions cost (rough estimate: 1 instruction = 0.00001 stroops)
+    if (simulation.cost.cpuInsns) {
+      estimatedFee += Math.ceil(simulation.cost.cpuInsns * 0.00001);
+    }
+    // Memory cost (rough estimate: 1 byte = 0.000001 stroops)
+    if (simulation.cost.memBytes) {
+      estimatedFee += Math.ceil(simulation.cost.memBytes * 0.000001);
+    }
+  }
+
+  // Convert stroops to XLM
+  return estimatedFee / 10000000;
+}
+
+/**
+ * Checks if account has sufficient balance for transaction
+ */
+async function validateAccountBalance(
+  accountAddress: string,
+  network: Network,
+  requiredFee: number,
+): Promise<{ sufficient: boolean; balance: number; required: number }> {
+  try {
+    // Use Horizon API to get account balance
+    const horizonUrl = RPC_ENDPOINTS[network];
+    const horizonServer = new Horizon.Server(horizonUrl);
+    const account = await horizonServer.loadAccount(accountAddress);
+    
+    // Get native XLM balance (first balance entry)
+    const xlmBalance = account.balances.find((b) => b.asset_type === 'native');
+    const balance = xlmBalance ? parseFloat(xlmBalance.balance) : 0;
+    
+    return {
+      sufficient: balance >= requiredFee,
+      balance,
+      required: requiredFee,
+    };
+  } catch {
+    // If we can't get account, assume insufficient (will fail later anyway)
+    return {
+      sufficient: false,
+      balance: 0,
+      required: requiredFee,
+    };
+  }
+}
+
+/**
+ * Generates a cache key for simulation results
+ */
+function getSimulationCacheKey(transaction: Transaction, accountAddress: string): string {
+  // Use transaction hash or XDR as cache key
+  try {
+    const xdr = transaction.toXDR();
+    return `${accountAddress}:${xdr.substring(0, 50)}`;
+  } catch {
+    // Fallback to account address + timestamp if we can't get XDR
+    return `${accountAddress}:${Date.now()}`;
+  }
+}
+
+/**
+ * Clears expired simulation cache entries
+ */
+function clearExpiredSimulationCache(): void {
+  const now = Date.now();
+  for (const [key, value] of simulationCache.entries()) {
+    if (now - value.timestamp > SIMULATION_CACHE_DURATION) {
+      simulationCache.delete(key);
+    }
+  }
+}
+
+/**
+ * Simulates a transaction before signing and returns detailed results
+ * 
+ * This function:
+ * - Checks cache for recent simulation results
+ * - Simulates the transaction using Soroban RPC
+ * - Validates account balance
+ * - Returns detailed simulation results including costs and fees
+ */
 async function simulateTransaction(
   server: Server,
-  transaction: Transaction | FeeBumpTransaction,
+  transaction: Transaction,
+  accountAddress: string,
+  network: Network,
   observer: TransactionObserver | undefined,
-): Promise<void> {
+): Promise<SimulationResult> {
   emitState(observer, 'simulating');
+
+  // Clear expired cache entries
+  clearExpiredSimulationCache();
+
+  // Check cache
+  const cacheKey = getSimulationCacheKey(transaction, accountAddress);
+  const cached = simulationCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < SIMULATION_CACHE_DURATION) {
+    emitState(observer, 'simulating', { simulation: cached.result, cached: true });
+    return cached.result;
+  }
 
   try {
     const simulation = await server.simulateTransaction(transaction);
 
-    if (Api.isSimulationError(simulation)) {
-      const errorMessage = parseContractError(simulation.error);
-      emitState(observer, 'failed', { error: errorMessage });
-      throw new Error(`Transaction simulation failed: ${errorMessage}`);
+    // Check if simulation failed
+    const simulationAny = simulation as unknown as Record<string, unknown>;
+    if ('error' in simulation || simulationAny.errorResult) {
+      const errorResult = (simulationAny.errorResult || simulationAny.error) as unknown;
+      const errorMessage = parseContractError(errorResult || simulation);
+      
+      const result: SimulationResult = {
+        success: false,
+        error: errorMessage,
+      };
+      
+      emitState(observer, 'failed', { error: errorMessage, simulation: result });
+      return result;
     }
 
-    if (Api.isSimulationRestore(simulation)) {
-      console.warn('Transaction requires restore preamble:', simulation.restorePreamble);
+    // Parse successful simulation
+    const costData = simulationAny.cost as { cpuInsns?: number; memBytes?: number } | undefined;
+    const cost: SimulationCost | undefined = costData
+      ? {
+          cpuInsns: costData.cpuInsns || 0,
+          memBytes: costData.memBytes || 0,
+        }
+      : undefined;
+
+    const footprintData = simulationAny.footprint as { readOnly?: string[]; readWrite?: string[] } | undefined;
+    const footprint: SimulationFootprint | undefined = footprintData
+      ? {
+          readOnly: footprintData.readOnly || [],
+          readWrite: footprintData.readWrite || [],
+        }
+      : undefined;
+
+    const result: SimulationResult = {
+      success: true,
+      cost,
+      footprint,
+      result: simulationAny.result,
+      estimatedFee: calculateEstimatedFee(simulationAny as { cost?: SimulationCost }),
+      requiresRestore: !!(simulationAny.restorePreamble),
+    };
+
+    // Validate account balance
+    if (result.estimatedFee) {
+      const balanceCheck = await validateAccountBalance(
+        accountAddress,
+        network,
+        result.estimatedFee,
+      );
+
+      if (!balanceCheck.sufficient) {
+        const errorMessage = `Insufficient balance. Required: ${balanceCheck.required.toFixed(7)} XLM, Available: ${balanceCheck.balance.toFixed(7)} XLM`;
+        result.success = false;
+        result.error = errorMessage;
+        emitState(observer, 'failed', { error: errorMessage, simulation: result });
+        return result;
+      }
+
+      // Add balance info to result
+      result.accountBalance = balanceCheck.balance;
     }
+
+    // Cache successful simulation result
+    simulationCache.set(cacheKey, {
+      result,
+      timestamp: Date.now(),
+    });
+
+    // Emit simulation success with details
+    emitState(observer, 'simulating', { simulation: result });
+
+    return result;
   } catch (error) {
     const errorMessage = parseContractError(error);
-    emitState(observer, 'failed', { error: errorMessage });
-    throw new Error(`Transaction simulation error: ${errorMessage}`);
+    const result: SimulationResult = {
+      success: false,
+      error: errorMessage,
+    };
+    
+    emitState(observer, 'failed', { error: errorMessage, simulation: result });
+    return result;
   }
 }
 
@@ -293,7 +521,21 @@ export async function mintWrap(options: MintWrapOptions): Promise<MintResult> {
 
     const server = createSorobanServer(network);
 
-    await simulateTransaction(server, transaction, observer);
+    // 3. Simulate transaction
+    const simulationResult = await simulateTransaction(
+      server,
+      transaction,
+      accountAddress,
+      network,
+      observer,
+    );
+
+    // Only proceed if simulation succeeded
+    if (!simulationResult.success) {
+      throw new Error(
+        simulationResult.error || 'Transaction simulation failed',
+      );
+    }
 
     const transactionXdr = transaction.toXDR();
 
@@ -309,4 +551,11 @@ export async function mintWrap(options: MintWrapOptions): Promise<MintResult> {
     emitState(observer, 'failed', { error: errorMessage });
     throw new Error(`Minting failed: ${errorMessage}`);
   }
+}
+
+/**
+ * Clears the simulation cache (useful for testing or when account balance changes)
+ */
+export function clearSimulationCache(): void {
+  simulationCache.clear();
 }

@@ -1,4 +1,4 @@
-import { Horizon } from 'stellar-sdk';
+import { Horizon } from '@stellar/stellar-sdk';
 import { Network, RPC_ENDPOINTS } from '../config';
 import { horizonQueue } from '../utils/horizonRequestQueue';
 
@@ -35,8 +35,9 @@ class ResponseCache {
 
 const cache = new ResponseCache();
 
-
-
+/**
+ * Service to fetch data from Stellar Horizon with rate limiting and caching
+ */
 export class HorizonIndexerService {
     private servers: Partial<Record<Network, HorizonServer>> = {};
 
@@ -59,6 +60,9 @@ export class HorizonIndexerService {
         return result;
     }
 
+    /**
+     * Fetches payments for an account
+     */
     async getPayments(
         address: string,
         network: Network,
@@ -83,6 +87,9 @@ export class HorizonIndexerService {
         return result;
     }
 
+    /**
+     * Fetches transactions for an account
+     */
     async getTransactions(
         address: string,
         network: Network,

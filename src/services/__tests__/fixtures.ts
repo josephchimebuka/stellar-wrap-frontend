@@ -7,6 +7,7 @@
 import { IndexedTransaction } from '../indexer/types';
 import {
   createMockIndexedTransaction,
+  createMockOperation,
   createMockPaymentOperation,
   createMockContractOperation,
   createMockExtendFootprintOperation,
