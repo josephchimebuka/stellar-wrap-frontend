@@ -21,6 +21,7 @@ type TransactionRecord = {
 };
 import {
   IndexerResult,
+  IndexerResultWithMeta,
   PERIODS,
   WrapPeriod,
   getCacheKey,
@@ -71,51 +72,45 @@ const concurrencyManager = new ConcurrencyManager();
 /**
  * Runs `workFn` immediately (so we capture the result), then animates step
  * progress smoothly over `estimatedDuration` ms before marking it complete.
- * This ensures every step is visually visible to the user even when the
- * actual computation is near-instant.
+ * When background is true, skips all UI emissions.
  */
 async function animateStep<T>(
   step: IndexingStep,
   emitter: IndexerEventEmitter,
   workFn: () => T | Promise<T>,
+  background: boolean,
 ): Promise<T> {
+  const result = await workFn();
+  if (background) return result;
+
   const duration = INDEXING_STEPS[step].estimatedDuration;
   const startTime = Date.now();
-
-  // Do real work first — keep the dataflow correct
-  const result = await workFn();
-
-  // Animate from ~0 → 95% over remaining duration, then snap to 100%
   await new Promise<void>((resolve) => {
-    const tickMs = 80; // ~12 fps
+    const tickMs = 80;
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(95, Math.round((elapsed / duration) * 95));
       emitter.emitStepProgress(step, progress);
-
       if (elapsed >= duration) {
         clearInterval(interval);
         resolve();
       }
     }, tickMs);
   });
-
   emitter.emitStepComplete(step);
-
   return result;
 }
 
-export async function indexAccount(
+/**
+ * Internal: run full Horizon indexing. When background is true, no step events are emitted.
+ */
+async function runIndexingInternal(
   accountId: string,
-  network: "mainnet" | "testnet" = "mainnet",
-  period: WrapPeriod = "monthly",
+  network: "mainnet" | "testnet",
+  period: WrapPeriod,
+  background: boolean,
 ): Promise<IndexerResult> {
-  // IndexedDB cache check
   const cacheKey = getCacheKey(accountId, network, period);
-  const cached = await getCacheEntry(cacheKey);
-  if (cached && isCacheValid(cached)) {
-    return cached.result;
-  }
   const emitter = IndexerEventEmitter.getInstance();
   const server = getHorizonServer(network);
   const days = PERIODS[period];
@@ -124,22 +119,21 @@ export async function indexAccount(
 
   let currentEmittedStep: IndexingStep = "initializing";
 
-  try {
-    // ── Step 1: Initializing ─────────────────────────────────────────────────
-    currentEmittedStep = "initializing";
-    console.log("Emitting step change: initializing");
-    emitter.emitStepChange("initializing");
-    await animateStep("initializing", emitter, () => {
-      // Lightweight validation that the server config is ready
-      getHorizonServer(network);
-    });
-    console.log("Step complete: initializing");
+  const emit = (fn: () => void) => {
+    if (!background) fn();
+  };
 
-    // ── Step 2: Fetch transactions ───────────────────────────────────────────
-    // This step has real async work so we drive progress from actual fetch
-    // activity rather than using animateStep (which would double-animate).
+  try {
+    currentEmittedStep = "initializing";
+    emit(() => console.log("Emitting step change: initializing"));
+    emit(() => emitter.emitStepChange("initializing"));
+    await animateStep("initializing", emitter, () => {
+      getHorizonServer(network);
+    }, background);
+    emit(() => console.log("Step complete: initializing"));
+
     currentEmittedStep = "fetching-transactions";
-    emitter.emitStepChange("fetching-transactions");
+    emit(() => emitter.emitStepChange("fetching-transactions"));
 
     const allTransactions: unknown[] = [];
     const fetchDuration =
@@ -200,9 +194,11 @@ export async function indexAccount(
       const timeProgress = Math.round(
         ((Date.now() - fetchStart) / fetchDuration) * 95,
       );
-      emitter.emitStepProgress(
-        "fetching-transactions",
-        Math.min(95, Math.max(pageCount * 15, timeProgress)),
+      emit(() =>
+        emitter.emitStepProgress(
+          "fetching-transactions",
+          Math.min(95, Math.max(pageCount * 15, timeProgress)),
+        ),
       );
 
       // Fetch operations for each transaction and attach as array
@@ -240,9 +236,8 @@ export async function indexAccount(
       if (!cursor) hasMore = false;
     }
 
-    // Ensure the fetch step is visible for at least `fetchDuration` ms
     const fetchElapsed = Date.now() - fetchStart;
-    if (fetchElapsed < fetchDuration) {
+    if (!background && fetchElapsed < fetchDuration) {
       const remaining = fetchDuration - fetchElapsed;
       const tickMs = 80;
       await new Promise<void>((resolve) => {
@@ -261,12 +256,11 @@ export async function indexAccount(
         }, tickMs);
       });
     }
-    emitter.emitStepProgress("fetching-transactions", 100);
-    emitter.emitStepComplete("fetching-transactions");
+    emit(() => emitter.emitStepProgress("fetching-transactions", 100));
+    emit(() => emitter.emitStepComplete("fetching-transactions"));
 
-    // ── Step 3: Filter timeframes ────────────────────────────────────────────
     currentEmittedStep = "filtering-timeframes";
-    emitter.emitStepChange("filtering-timeframes");
+    emit(() => emitter.emitStepChange("filtering-timeframes"));
     const filteredTransactions = await animateStep(
       "filtering-timeframes",
       emitter,
@@ -275,11 +269,11 @@ export async function indexAccount(
           const txData = tx as unknown as Record<string, unknown>;
           return new Date(txData.created_at as string) >= cutoffDate;
         }),
+      background,
     );
 
-    // ── Step 4: Calculate volume ─────────────────────────────────────────────
     currentEmittedStep = "calculating-volume";
-    emitter.emitStepChange("calculating-volume");
+    emit(() => emitter.emitStepChange("calculating-volume"));
     await animateStep("calculating-volume", emitter, () => {
       filteredTransactions.forEach((tx) => {
         const txData = tx as Record<string, unknown>;
@@ -292,11 +286,10 @@ export async function indexAccount(
           },
         );
       });
-    });
+    }, background);
 
-    // ── Step 5: Identify assets ──────────────────────────────────────────────
     currentEmittedStep = "identifying-assets";
-    emitter.emitStepChange("identifying-assets");
+    emit(() => emitter.emitStepChange("identifying-assets"));
     const assetMap = await animateStep("identifying-assets", emitter, () => {
       const map = new Map<string, number>();
       filteredTransactions.forEach((tx) => {
@@ -312,11 +305,10 @@ export async function indexAccount(
         );
       });
       return map;
-    });
+    }, background);
 
-    // ── Step 6: Count contracts ──────────────────────────────────────────────
     currentEmittedStep = "counting-contracts";
-    emitter.emitStepChange("counting-contracts");
+    emit(() => emitter.emitStepChange("counting-contracts"));
     await animateStep("counting-contracts", emitter, () =>
       filteredTransactions.reduce((count: number, tx) => {
         const txData = tx as Record<string, unknown>;
@@ -328,11 +320,10 @@ export async function indexAccount(
           ).length
         );
       }, 0),
-    );
+    background);
 
-    // ── Step 7: Finalize ─────────────────────────────────────────────────────
     currentEmittedStep = "finalizing";
-    emitter.emitStepChange("finalizing");
+    emit(() => emitter.emitStepChange("finalizing"));
     const result = await animateStep("finalizing", emitter, () => {
       const typedTransactions = allTransactions.map((tx) => {
         const txData = tx as Record<string, unknown>;
@@ -346,17 +337,61 @@ export async function indexAccount(
       r.accountId = accountId;
       void assetMap; // consumed by achievementCalculator indirectly
       return r;
-    });
+    }, background);
 
-    emitter.emitIndexingComplete(result);
-    // Store result in IndexedDB cache
+    emit(() => emitter.emitIndexingComplete(result));
     await setCacheEntry(cacheKey, { result, timestamp: Date.now() });
     return result;
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error during indexing";
     console.error(`Error indexing account ${accountId}:`, error);
-    emitter.emitStepError(currentEmittedStep, errorMessage, true);
+    emit(() => emitter.emitStepError(currentEmittedStep, errorMessage, true));
     throw error;
   }
+}
+
+/**
+ * Index account with cache: return cached data if fresh, else index and optionally
+ * return stale cache while re-indexing in background.
+ */
+export async function indexAccount(
+  accountId: string,
+  network: "mainnet" | "testnet" = "mainnet",
+  period: WrapPeriod = "monthly",
+): Promise<IndexerResultWithMeta> {
+  const cacheKey = getCacheKey(accountId, network, period);
+  const cached = await getCacheEntry(cacheKey);
+
+  if (cached && isCacheValid(cached)) {
+    return {
+      result: cached.result,
+      fromCache: true,
+      cacheTimestamp: cached.timestamp,
+    };
+  }
+
+  if (cached && !isCacheValid(cached)) {
+    // Return stale cache immediately and refresh in background
+    void runIndexingInternal(accountId, network, period, true).then(
+      (result) => {
+        setCacheEntry(cacheKey, { result, timestamp: Date.now() });
+      },
+      (err) => {
+        console.warn("[Indexer] Background refresh failed:", err);
+      },
+    );
+    return {
+      result: cached.result,
+      fromCache: true,
+      cacheTimestamp: cached.timestamp,
+      refreshingInBackground: true,
+    };
+  }
+
+  const result = await runIndexingInternal(accountId, network, period, false);
+  return {
+    result,
+    fromCache: false,
+  };
 }

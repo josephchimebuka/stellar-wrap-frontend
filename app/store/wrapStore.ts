@@ -38,6 +38,13 @@ export interface WrapResult {
 
 type WrapStatus = "idle" | "loading" | "ready" | "error";
 
+/** Cache metadata for UI (badge, age, refresh). Issue #48 */
+export interface CacheMeta {
+  fromCache: boolean;
+  cacheTimestamp?: number;
+  refreshingInBackground?: boolean;
+}
+
 /** Contract addresses per network (from config/env), synced on load and network change */
 export type ContractAddressesByNetwork = Partial<Record<Network, string>>;
 // In-memory cache for API results
@@ -58,6 +65,8 @@ interface WrapStoreState {
   status: WrapStatus;
   error: string | null;
   result: WrapResult | null;
+  /** Cache metadata for "Using cached data" badge and age. Issue #48 */
+  cacheMeta: CacheMeta | null;
   /** Contract address for the current network; updated when network changes */
   currentContractAddress: string | null;
   /** Contract addresses per network (mainnet, testnet); synced from config */
@@ -69,6 +78,7 @@ interface WrapStoreState {
   setStatus: (status: WrapStatus) => void;
   setError: (error: string | null) => void;
   setResult: (result: WrapResult | null) => void;
+  setCacheMeta: (meta: CacheMeta | null) => void;
   setContractAddresses: (addresses: ContractAddressesByNetwork) => void;
   reset: () => void;
 }
@@ -104,6 +114,7 @@ export const useWrapStore = create<WrapStoreState>()(
       status: "idle",
       error: null,
       result: null,
+      cacheMeta: null,
       currentContractAddress: null,
       contractAddresses: {},
       setAddress: (address) => set({ address }),
@@ -112,6 +123,7 @@ export const useWrapStore = create<WrapStoreState>()(
       setStatus: (status) => set({ status }),
       setError: (error) => set({ error }),
       setResult: (result) => set({ result }),
+      setCacheMeta: (cacheMeta) => set({ cacheMeta }),
       setContractAddresses: (contractAddresses) => set({ contractAddresses }),
       reset: () =>
         set({
@@ -121,6 +133,7 @@ export const useWrapStore = create<WrapStoreState>()(
           status: "idle",
           error: null,
           result: null,
+          cacheMeta: null,
           currentContractAddress: null,
           contractAddresses: {},
         }),

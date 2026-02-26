@@ -6,6 +6,7 @@ import { Home, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ProgressIndicator } from "../components/ProgressIndicator";
 import { StepProgressDisplay } from "../components/StepProgressDisplay";
+import { CacheStatusBadge } from "../components/CacheStatusBadge";
 import { MuteToggle } from "../components/MuteToggle";
 import { useWrapStore } from "../store/wrapStore";
 import { useIndexingStore } from "../store/indexingStore";
@@ -17,7 +18,7 @@ import { IndexerEventEmitter } from "../utils/indexerEventEmitter";
 
 export default function LoadingScreen() {
   const router = useRouter();
-  const { address, period, network, setStatus, setResult, setError } =
+  const { address, period, network, setStatus, setResult, setError, setCacheMeta } =
     useWrapStore();
   const { startIndexing, cancelIndexing, loadState } = useIndexingStore();
   const { playSound } = useSound();
@@ -77,6 +78,7 @@ export default function LoadingScreen() {
       try {
         setStatus("loading");
         setError(null);
+        setCacheMeta(null);
 
         // NOTE: Do NOT call loadState() here - it will overwrite isLoading: true
         // The startIndexing() call above already set isLoading, which is what matters
@@ -87,12 +89,19 @@ export default function LoadingScreen() {
         if (address) {
           try {
             console.log("Starting real indexer with address:", address);
-            const indexerResult = await indexAccount(
+            const indexerResponse = await indexAccount(
               address,
               network as "mainnet" | "testnet",
               period as "weekly" | "monthly" | "yearly",
             );
-            console.log("Indexer completed, result:", indexerResult);
+            const indexerResult = indexerResponse.result;
+            console.log("Indexer completed, result:", indexerResult, "fromCache:", indexerResponse.fromCache);
+
+            setCacheMeta({
+              fromCache: indexerResponse.fromCache,
+              cacheTimestamp: indexerResponse.cacheTimestamp,
+              refreshingInBackground: indexerResponse.refreshingInBackground,
+            });
 
             // Map indexer result to wrap result format
             result = {
@@ -189,6 +198,7 @@ export default function LoadingScreen() {
     setError,
     setResult,
     setStatus,
+    setCacheMeta,
     handleComplete,
     startIndexing,
     loadState,
@@ -213,11 +223,12 @@ export default function LoadingScreen() {
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-full max-w-6xl px-4 pointer-events-auto">
         <div className="flex items-center justify-between gap-8">
           {/* Step Progress Display - Left side */}
-          <div className="w-80 md:w-96 pointer-events-auto">
+          <div className="w-80 md:w-96 pointer-events-auto space-y-4">
             <StepProgressDisplay
               onCancel={handleCancel}
               onRetry={handleRetry}
             />
+            <CacheStatusBadge />
           </div>
 
           {/* Content area - Right side will be filled by the main content below */}

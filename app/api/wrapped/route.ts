@@ -5,13 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { indexAccount } from "@/app/services/indexerService";
-import {
-  WrapPeriod,
-  getCacheKey,
-  isCacheValid,
-  PERIODS,
-} from "@/app/utils/indexer";
-import { getCacheStore } from "@/app/store/wrapStore";
+import { WrapPeriod, PERIODS } from "@/app/utils/indexer";
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,30 +38,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid period" }, { status: 400 });
     }
 
-    // Check cache
-    const cacheKey = getCacheKey(accountId, network, period);
-    const cache = getCacheStore();
-    const cachedEntry = cache[cacheKey];
-
-    if (cachedEntry && isCacheValid(cachedEntry)) {
-      return NextResponse.json({
-        ...cachedEntry.result,
-        cached: true,
-      });
-    }
-
-    // Fetch fresh data
-    const result = await indexAccount(accountId, network, period);
-
-    // Cache the result
-    cache[cacheKey] = {
-      result,
-      timestamp: Date.now(),
-    };
+    // indexAccount uses IndexedDB cache internally and returns result + fromCache
+    const response = await indexAccount(accountId, network, period);
 
     return NextResponse.json({
-      ...result,
-      cached: false,
+      ...response.result,
+      cached: response.fromCache,
+      cacheTimestamp: response.cacheTimestamp,
+      refreshingInBackground: response.refreshingInBackground,
     });
   } catch (error: unknown) {
     console.error("Error in /api/wrapped:", error);
